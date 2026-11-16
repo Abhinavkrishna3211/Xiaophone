@@ -1,0 +1,17 @@
+# PlatformIO / editor
+.pio/
+.vscode/
+
+# Secrets (copy firmware/src/secrets.example.h -> secrets.h)
+firmware/src/secrets.h
+
+# Blender backups
+*.blend1
+
+# Tripo3D raw exports (large; uncomment specific ones that are < 50 MB if you want them tracked)
+enclosure/raw/*.glb
+
+# OS junk
+Thumbs.db
+.DS_Store
+
