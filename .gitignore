@@ -1,0 +1,17 @@
+# PlatformIO / editor
+.pio/
+.vscode/
+
+# Secrets (copy firmware/src/secrets.example.h -> secrets.h)
+firmware/src/secrets.h
+
+# Blender backups
+*.blend1
+
+# Base-model raw exports (large)
+enclosure/raw/*.glb
+
+# OS junk
+Thumbs.db
+.DS_Store
+
