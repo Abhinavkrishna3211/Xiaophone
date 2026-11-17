@@ -1,0 +1,3 @@
+[submodule "firmware/external/spotifyesp"]
+	path = firmware/external/spotifyesp
+	url = https://github.com/sharkzor/spotifyesp.git
