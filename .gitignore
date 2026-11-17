@@ -25,3 +25,4 @@ enclosure/tools/
 CLAUDE.md
 PLAN.md
 .claude/
+__pycache__/

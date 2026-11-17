@@ -65,10 +65,10 @@ static void titleSet(const std::string& t) {
       g.fillScreen(KEY);
       g.setFont(f);
       g.setTextDatum(middle_center);
-      g.setTextColor((uint16_t)TFT_BLACK);
+      g.setTextColor(lgfx::color565(70, 40, 18));  // soft brown outline
       int cx = (w + 4) / 2;
       for (int d = -1; d <= 1; d += 2) { g.drawString(ch, cx + d, 12); g.drawString(ch, cx, 12 + d); }
-      g.setTextColor((uint16_t)TFT_WHITE);
+      g.setTextColor(lgfx::color565(255, 246, 225));  // cream
       g.drawString(ch, cx, 12);
       g.setPivot(cx, 12);
       gAng[gN++] = start + (x + w / 2.0f) / TR_R;
@@ -97,21 +97,45 @@ static void sparklesSpawn(uint32_t now) {
   for (auto& p : sp) p = {random(360) * 0.01745f, 106.0f + random(12), now + random(700), 450u + random(450)};
 }
 
+static void star(LGFX_Sprite& s, int x, int y, int sz, uint16_t c) {  // 4-point twinkle
+  int d = sz > 3 ? sz / 4 : 1;
+  s.fillTriangle(x, y - sz, x - d, y, x + d, y, c);
+  s.fillTriangle(x, y + sz, x - d, y, x + d, y, c);
+  s.fillTriangle(x - sz, y, x, y - d, x, y + d, c);
+  s.fillTriangle(x + sz, y, x, y - d, x, y + d, c);
+}
+
 static void sparklesDraw(LGFX_Sprite& s, int oy, uint32_t now) {
-  uint16_t c1 = lgfx::color565(255, 215, 90), c2 = lgfx::color565(255, 250, 220);
+  const uint16_t pal[3] = {lgfx::color565(255, 210, 90), lgfx::color565(255, 182, 193), lgfx::color565(255, 250, 230)};
+  int i = 0;
   for (auto& p : sp) {
+    uint16_t c = pal[i++ % 3];
     if (now < p.t0 || now > p.t0 + p.life) continue;
     float k = (float)(now - p.t0) / p.life;
-    int sz = 1 + (int)(5 * sinf(3.1416f * k));
-    int x = 120 + p.r * cosf(p.a), y = 120 + p.r * sinf(p.a) - oy;
+    int sz = 2 + (int)(6 * sinf(3.1416f * k));
+    float r = p.r - 8 + 10 * k;  // drift outward
+    int x = 120 + r * cosf(p.a), y = 120 + r * sinf(p.a) - oy;
     if (y + sz < 0 || y - sz >= SH) continue;
-    s.drawFastHLine(x - sz, y, 2 * sz + 1, c1);
-    s.drawFastVLine(x, y - sz, 2 * sz + 1, c1);
-    int d = sz / 2;
-    s.drawLine(x - d, y - d, x + d, y + d, c1);
-    s.drawLine(x - d, y + d, x + d, y - d, c1);
-    s.fillCircle(x, y, 1, c2);
+    star(s, x, y, sz, c);
   }
+}
+
+// sleepy face on the default label: closed eyes + blush while asleep, blink open on wake
+static void faceDraw(LGFX_Sprite& s, int oy, uint32_t now, bool awake) {
+  if (oy > 145 || oy + SH < 105) return;
+  uint16_t brown = lgfx::color565(110, 72, 38), blush = lgfx::color565(245, 170, 180);
+  s.fillEllipse(91, 131 - oy, 7, 4, blush);
+  s.fillEllipse(149, 131 - oy, 7, 4, blush);
+  bool open = awake && (now - stT) > 350 && (now - stT) % 1200 > 120;  // one blink, then open
+  for (int ex : {101, 139}) {
+    if (open) {
+      s.fillCircle(ex, 118 - oy, 4, brown);
+      s.fillCircle(ex + 1, 117 - oy, 1, (uint16_t)TFT_WHITE);
+    } else {
+      s.fillArc(ex, 115 - oy, 4, 6, 20, 160, brown);  // closed eye: little smile-shaped arc
+    }
+  }
+  s.fillArc(120, 128 - oy, 7, 9, 30, 150, brown);  // tiny smile under the spindle
 }
 
 // ---------- label decorations ----------
@@ -157,8 +181,8 @@ static void noteDraw(LGFX_Sprite& s, int oy, uint32_t now) {
 static void dotsDraw(LGFX_Sprite& s, int oy, uint32_t now) {
   int on = (now / 400) % 4;
   for (int k = 0; k < on; k++) {
-    s.fillCircle(108 + 12 * k, 96 - oy, 4, (uint16_t)TFT_BLACK);
-    s.fillCircle(108 + 12 * k, 96 - oy, 3, (uint16_t)TFT_WHITE);
+    s.fillCircle(108 + 12 * k, 96 - oy, 4, lgfx::color565(110, 72, 38));
+    s.fillCircle(108 + 12 * k, 96 - oy, 3, lgfx::color565(255, 210, 90));
   }
 }
 
@@ -219,6 +243,7 @@ static void overlays(LGFX_Sprite& s, int oy, uint32_t now) {
                               : 1 + 0.10f * sinf(now / 220.0f);
     heartDraw(s, oy, pulse);
   }
+  if (def && (st == SLEEP || st == WAKE)) faceDraw(s, oy, now, st == WAKE);
   if (st == SLEEP) zzzDraw(s, oy, now);
   if (st == TUNING && def) noteDraw(s, oy, now);
   if (st == LOST) dotsDraw(s, oy, now);
@@ -248,7 +273,7 @@ static void renderTask(void*) {
       tft.pushImageDMA(0, oy, 240, SH, (lgfx::swap565_t*)px);
     }
     tft.endWrite();
-    frames++;
+    frames = frames + 1;
     if (xTaskDelayUntil(&last, pdMS_TO_TICKS(40)) == pdFALSE) vTaskDelay(1);  // ~25 fps cap, always yield
   }
 }
