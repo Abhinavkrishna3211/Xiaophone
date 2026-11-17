@@ -72,9 +72,24 @@ are printed every 5 s.
 HTTPS requests skip certificate checks (`setInsecure`). The lookup only reads public
 data, so no secrets are ever sent.
 
-Enclosure: Blender scripts in `enclosure/scripts/` (run with `blender -b -P <script>.py`)
-produce print-ready STLs in `enclosure/stl/`. Cabinet + lid in matte ivory PLA,
-horn and small parts in silk gold PLA.
+## Enclosure
+
+The cabinet starts from the base model (`enclosure/raw/`, not tracked) and is rebuilt
+around the hardware by re-runnable Blender scripts in `enclosure/scripts/`
+(`blender -b -P <script>.py`, in order 00 to 06; every dimension lives in `DIM` in
+`_common.py`). `check_parts.py` (trimesh) verifies the STLs and writes
+`stl/xiaophone_all.3mf`.
+
+| Part | Colour | Notes |
+|---|---|---|
+| shell | matte ivory | prints upside down, display pocket on the bed |
+| plate | matte ivory | feet down, supports under the speaker pod |
+| horn | silk gold | mouth down, tree supports under the neck |
+| rim, tonearm, pivot_knob, crank, caps, trims, grille, heart | silk gold | small parts pin on with 1.75 mm filament snips |
+| vinyl | matte black | grooves on the bed |
+
+`stl/test_display_pocket.stl` is the top 6 mm of the shell: print it first to check the
+display fit.
 
 ## Credits
 

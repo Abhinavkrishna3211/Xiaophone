@@ -8,10 +8,20 @@ firmware/src/secrets.h
 # Blender backups
 *.blend1
 
-# Tripo3D raw exports (large; uncomment specific ones that are < 50 MB if you want them tracked)
+# Base-model raw exports (large)
 enclosure/raw/*.glb
 
 # OS junk
 Thumbs.db
 .DS_Store
 
+
+# Enclosure pipeline intermediates / local tools
+enclosure/.venv/
+enclosure/work/
+enclosure/tools/
+
+# Local notes
+CLAUDE.md
+PLAN.md
+.claude/
