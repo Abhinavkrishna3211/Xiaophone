@@ -11,6 +11,7 @@
 #include <ESPmDNS.h>
 #include "spotify_bridge.h"
 #include "usb_speaker.h"
+#include "nowplaying.h"
 
 #if DEMO_MODE
 static const char* DEMO[][2] = {
@@ -42,6 +43,7 @@ void setup() {
   Serial.println("[AUDIO] demo mode: radio off");
 #else
   audioBegin();
+  nowPlayingBegin();
 #endif
   logMem("ready");
 }

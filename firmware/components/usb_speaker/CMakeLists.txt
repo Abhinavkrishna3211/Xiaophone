@@ -2,5 +2,5 @@
 idf_component_register(
     SRCS "usb_speaker.cpp"
     INCLUDE_DIRS "."
-    REQUIRES esp_driver_i2s esp_timer usb_device_uac
+    REQUIRES esp_driver_i2s esp_timer usb_device_uac lwip log heap
 )

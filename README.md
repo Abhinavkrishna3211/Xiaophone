@@ -83,9 +83,29 @@ the official app. The phone powers it. The radio pauses as soon as sound arrives
 back after 5 minutes of silence. The phone's volume buttons set the level, capped by
 `USB_MAX_GAIN` in `config.h`. Lower that cap if a phone cuts power at high volume.
 
+**Spotify cover over USB (optional).** While USB audio plays, the Xiaophone can ask
+Spotify's Web API what is playing on your account and spin that cover. One-time setup:
+
+1. At developer.spotify.com/dashboard, click **Create app**. Fill in a name and a
+   description, enter `http://127.0.0.1:8888/callback` as the Redirect URI and click
+   **Add**, tick **Web API**, accept the terms and click **Save**.
+
+   ![Create app form](docs/images/spotify_app_form_1.png)
+   ![Create app form, lower half](docs/images/spotify_app_form_2.png)
+
+2. Copy the **Client ID** from the app's Settings. The Client Secret is not needed.
+3. Run `python firmware/tools/spotify_token.py <client-id>`, log in in the browser that
+   opens, and paste the two printed `#define` lines into `firmware/src/secrets.h`.
+4. Build and flash. The cover appears within about 4 s of a new song.
+
+Without these lines the feature is left out of the build. Spotify sign-ins for apps in
+development mode last 180 days. If covers stop appearing after that, run step 3 again.
+
 USB switches from the serial console to audio 6 s after boot, so logs stop there. To flash
 again, hold BOOT while plugging in. `components/usb_device_uac` is Espressif's component
 (Apache-2.0), kept locally with one CMake fix for PlatformIO.
+
+Over Wi-Fi the same logs are on TCP port 23: `python firmware/tools/netlog.py xiaophone.local`.
 
 Serial logs are tagged `[WIFI] [AUDIO] [META] [COVER] [GFX] [MEM] [SPOTIFY]`. FPS, heap and PSRAM
 are printed every 5 s.

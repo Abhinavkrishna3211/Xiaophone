@@ -8,3 +8,7 @@
 #define STATION_URL_1 "http://stream.radioparadise.com/mp3-128"
 #define STATION_URL_2 "http://ice1.somafm.com/indiepop-128-mp3"
 #define STATION_URL_3 "http://ice1.somafm.com/u80s-128-mp3"
+
+// Optional: Spotify cover while the USB speaker plays. Run tools/spotify_token.py once.
+// #define SPOTIFY_CLIENT_ID     "your-app-client-id"
+// #define SPOTIFY_REFRESH_TOKEN "printed-by-the-script"
