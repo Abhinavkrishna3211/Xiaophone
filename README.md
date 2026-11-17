@@ -75,6 +75,18 @@ key that unofficial clients use (`Audio key refused by Spotify ... code 0001`). 
 connects and the app shows it playing, but no audio arrives. This happens on Spotify's side
 and also affects librespot and go-librespot. There is no fix yet. An older account may work.
 
+### USB speaker
+
+The Xiaophone is also a USB sound card (48 kHz stereo). Connect it to a phone (Android or a
+USB-C iPhone) or a computer with a USB-C cable and play anything, Spotify included, through
+the official app. The phone powers it. The radio pauses as soon as sound arrives, and comes
+back after 5 minutes of silence. The phone's volume buttons set the level, capped by
+`USB_MAX_GAIN` in `config.h`. Lower that cap if a phone cuts power at high volume.
+
+USB switches from the serial console to audio 6 s after boot, so logs stop there. To flash
+again, hold BOOT while plugging in. `components/usb_device_uac` is Espressif's component
+(Apache-2.0), kept locally with one CMake fix for PlatformIO.
+
 Serial logs are tagged `[WIFI] [AUDIO] [META] [COVER] [GFX] [MEM] [SPOTIFY]`. FPS, heap and PSRAM
 are printed every 5 s.
 

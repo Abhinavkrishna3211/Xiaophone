@@ -1,4 +1,4 @@
-// Xiaophone: internet radio + Spotify Connect, album cover spinning like a record.
+// Xiaophone: internet radio + Spotify Connect + USB speaker, album cover spinning like a record.
 #include <Arduino.h>
 #include "config.h"
 #include "display.h"
@@ -10,6 +10,7 @@
 #include "cover.h"
 #include <ESPmDNS.h>
 #include "spotify_bridge.h"
+#include "usb_speaker.h"
 
 #if DEMO_MODE
 static const char* DEMO[][2] = {
@@ -57,10 +58,21 @@ void loop() {
     MDNS.begin("xiaophone");
     spotify::Hooks h;
     h.onTrack = [](const spotify::Track& t) { coverRequest(t.artist, t.title, t.imageUrl); };
-    h.onActive = audioYield;
+    h.onActive = [](bool y) { audioYield(YIELD_SPOTIFY, y); };
     h.mix = soundsMix;
     spotify::begin("Xiaophone", PIN_BCLK, PIN_LRC, PIN_DIN, h);
     Serial.println("[SPOTIFY] receiver started");
+  }
+  static bool usbOn = false;
+  if (!usbOn && now > 6000) {  // USB sound card: the first seconds of boot log stay on the USB console
+    usbOn = true;
+    Serial.println("[USB] switching USB to speaker mode, console ends here");
+    Serial.flush();
+    usbspk::Hooks u;
+    u.canTake = [] { return !spotify::active(); };
+    u.onActive = [](bool y) { audioYield(YIELD_USB, y); };
+    u.mix = soundsMix;
+    usbspk::begin(PIN_BCLK, PIN_LRC, PIN_DIN, USB_MAX_GAIN, u);
   }
 #endif
 

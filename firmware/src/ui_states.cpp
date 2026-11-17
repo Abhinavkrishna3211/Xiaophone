@@ -14,7 +14,7 @@ enum Tr { TR_NONE, TR_DOWN, TR_OUT, TR_IN };
 static const char* NAMES[] = {"sleep", "wake", "tuning", "playing", "lost"};
 
 static const int SH = 60;                  // strip height
-static const float FULL = 198.0f;          // deg/s = 0.55 rev/s (33 1/3 rpm feel)
+static const float FULL = 100.0f;          // deg/s = 0.28 rev/s (~17 rpm, slower and easier to see the cover)
 static const uint16_t KEY = 0xF81F;        // transparent key for glyph sprites (magenta)
 
 static LGFX_Sprite strip[2];

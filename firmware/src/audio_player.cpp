@@ -8,9 +8,11 @@
 #include "cover.h"
 #include "sounds.h"
 #include "spotify_bridge.h"
+#include "usb_speaker.h"
 
 static Audio audio;
-static volatile bool streaming = false, yieldReq = false;
+static volatile bool streaming = false;
+static volatile uint8_t yieldMask = 0;  // bit per speaker borrower (Spotify, USB)
 static const char* stations[] = {
   STATION_URL_1,
 #ifdef STATION_URL_2
@@ -22,9 +24,9 @@ static const char* stations[] = {
 };
 static const int NST = sizeof(stations) / sizeof(stations[0]);
 
-bool audioStreaming() { return streaming || spotify::playing(); }
-bool audioPaused() { return spotify::active() && !spotify::playing(); }
-void audioYield(bool y) { yieldReq = y; }
+bool audioStreaming() { return streaming || spotify::playing() || usbspk::playing(); }
+bool audioPaused() { return (spotify::active() && !spotify::playing()) || (usbspk::active() && !usbspk::playing()); }
+void audioYield(uint8_t who, bool y) { if (y) yieldMask |= who; else yieldMask &= ~who; }
 uint32_t audioSampleRate() { return audio.getSampleRate(); }
 
 static void onInfo(Audio::msg_t m) {
@@ -53,15 +55,15 @@ static void audioTask(void*) {
   bool yielded = false;
 
   for (;;) {
-    if (yieldReq != yielded) {
-      yielded = yieldReq;
-      if (yielded) {  // Spotify takes the speaker
+    if ((yieldMask != 0) != yielded) {
+      yielded = yieldMask != 0;
+      if (yielded) {  // Spotify or USB takes the speaker
         audio.stopSong();
         streaming = false;
         mode = IDLE;
         chimed = true;
-        Serial.println("[AUDIO] radio paused for Spotify");
-      } else {  // Spotify let go: route the I2S pins back to our channel and reconnect
+        Serial.println("[AUDIO] radio paused");
+      } else {  // speaker free again: route the I2S pins back to our channel and reconnect
         audio.setPinout(PIN_BCLK, PIN_LRC, PIN_DIN);
         lastTry = 0;
         Serial.println("[AUDIO] radio back");
