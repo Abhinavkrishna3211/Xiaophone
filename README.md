@@ -72,8 +72,21 @@ are printed every 5 s.
 HTTPS requests skip certificate checks (`setInsecure`). The lookup only reads public
 data, so no secrets are ever sent.
 
-Enclosure: designed in Blender; print-ready STLs are in `enclosure/stl/`. Cabinet + lid in matte ivory PLA,
-horn and small parts in silk gold PLA.
+## Enclosure
+
+The cabinet was designed in Blender. Print-ready files are in `enclosure/stl/`: one STL
+per part, already oriented for the bed, plus `xiaophone_all.3mf`.
+
+| Part | Colour | Notes |
+|---|---|---|
+| shell | matte ivory | prints upside down, display pocket on the bed |
+| plate | matte ivory | feet down, supports under the speaker pod |
+| horn | silk gold | mouth down, tree supports under the neck |
+| rim, tonearm, pivot_knob, crank, caps, trims, grille, heart | silk gold | small parts pin on with 1.75 mm filament snips |
+| vinyl | matte black | grooves on the bed |
+
+`stl/test_display_pocket.stl` is the top 6 mm of the shell: print it first to check the
+display fit.
 
 ## Credits
 
