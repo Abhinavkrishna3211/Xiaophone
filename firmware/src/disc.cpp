@@ -55,9 +55,17 @@ static void buildDefault(LGFX_Sprite& s) {
   s.fillCircle(120, 120, 119, lgfx::color565(22, 22, 26));
   for (int r = 62; r < 118; r += 3) s.drawCircle(120, 120, r, lgfx::color565(36, 36, 42));  // fine grooves
   s.drawCircle(120, 120, 90, lgfx::color565(12, 12, 14));                                    // track gap
-  s.fillCircle(120, 120, 57, lgfx::color565(212, 175, 55));                                  // gold rim
-  s.fillCircle(120, 120, 55, lgfx::color565(246, 236, 214));                                 // cream label
-  s.drawCircle(120, 120, 49, lgfx::color565(212, 175, 55));
+  uint16_t g = lgfx::color565(212, 175, 55);
+  for (int i = 0; i < 28; i++) {  // scalloped gold edge
+    float a = i * 6.2832f / 28;
+    s.fillCircle(120 + 56 * cosf(a), 120 + 56 * sinf(a), 5, g);
+  }
+  s.fillCircle(120, 120, 56, g);
+  s.fillCircle(120, 120, 54, lgfx::color565(246, 236, 214));  // cream label
+  for (int i = 0; i < 36; i++) {  // dotted inner ring
+    float a = i * 6.2832f / 36;
+    s.fillCircle(120 + 47 * cosf(a), 120 + 47 * sinf(a), 1, g);
+  }
   s.setTextDatum(middle_center);
   s.setFont(&fonts::FreeSerifItalic9pt7b);
   s.setTextColor(lgfx::color565(140, 100, 45));

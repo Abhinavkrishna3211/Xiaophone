@@ -21,3 +21,4 @@ enclosure/.venv/
 enclosure/work/
 enclosure/tools/
 
+__pycache__/
