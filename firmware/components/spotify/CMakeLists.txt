@@ -17,6 +17,7 @@ set(CSPOT_DIR "${CMAKE_CURRENT_LIST_DIR}/../../external/spotifyesp/cspot/cspot")
 # sources cspot expects are generated here at configure time instead.
 idf_build_get_property(python PYTHON)
 file(GLOB protos RELATIVE "${CSPOT_DIR}" "${CSPOT_DIR}/protobuf/*.proto")
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/cspot")
 execute_process(
     COMMAND ${python} bell/external/nanopb/generator/nanopb_generator.py -q -I. -Iprotobuf
             -D "${CMAKE_CURRENT_BINARY_DIR}/cspot" ${protos}
