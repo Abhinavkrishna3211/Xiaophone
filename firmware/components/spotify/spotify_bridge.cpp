@@ -17,6 +17,8 @@
 #include <LoginBlob.h>
 #include <Logger.h>
 #include <MDNSService.h>
+#include <PlainConnection.h>
+#include <Session.h>
 #include <SpircHandler.h>
 #include <TrackPlayer.h>
 #include <civetweb.h>
@@ -246,6 +248,12 @@ class Player : public bell::Task {
 
 // ---- receiver: zeroconf login, then the Spotify session loop ----
 
+// cspot gives up on the first 3 s read timeout until the session task runs, but the login
+// reply can take longer. Reach the protected connection to allow a few timeouts (~15 s).
+struct SessionConn : cspot::Session {
+  using cspot::Session::conn;
+};
+
 static void receiverTask(void*) {
   auto blob = std::make_shared<cspot::LoginBlob>(devName);
   std::atomic<bool> gotBlob{false};
@@ -299,31 +307,41 @@ static void receiverTask(void*) {
   } else {
     ESP_LOGI(TAG, "waiting for the Spotify app: pick \"%s\" in the device list", devName.c_str());
   }
-  while (!gotBlob) BELL_SLEEP_MS(500);
-
-  auto ctx = cspot::Context::createFromBlob(blob);
-  ctx->config.audioFormat = AudioFormat_OGG_VORBIS_160;  // easier on Wi-Fi and CPU than 320
-  bool connected = false;
-  for (int i = 0; i < 5 && !connected; i++) {
-    try {
-      ctx->session->connectWithRandomAp();
-      connected = true;
-    } catch (const std::exception& ex) {
-      ESP_LOGE(TAG, "AP connect failed: %s", ex.what());
+  // Never reboot here: the zeroconf keys live in RAM, so a reboot would make the phone's
+  // retry fail ("MAC mismatch"). Retry the sign-in, then fall back to waiting for the app.
+  std::shared_ptr<cspot::Context> ctx;
+  for (;;) {
+    while (!gotBlob) BELL_SLEEP_MS(500);
+    bool rejected = false;
+    for (int i = 0; i < 4 && !rejected; i++) {
+      ctx = cspot::Context::createFromBlob(blob);
+      ctx->config.audioFormat = AudioFormat_OGG_VORBIS_160;  // easier on Wi-Fi and CPU than 320
+      try {
+        ctx->session->connectWithRandomAp();
+        auto& conn = (*ctx->session).*(&SessionConn::conn);
+        auto own = conn->timeoutHandler;
+        conn->timeoutHandler = [n = 0]() mutable { return ++n >= 5; };
+        ctx->config.authData = ctx->session->authenticate(blob);
+        conn->timeoutHandler = own;
+        rejected = ctx->config.authData.empty();
+      } catch (const std::exception& ex) {
+        ESP_LOGE(TAG, "sign-in attempt %d failed: %s", i + 1, ex.what());
+        ctx->config.authData.clear();
+      }
+      if (!ctx->config.authData.empty()) break;
       BELL_SLEEP_MS(2000);
     }
-  }
-  if (!connected) esp_restart();
-  try {
-    ctx->config.authData = ctx->session->authenticate(blob);
-  } catch (const std::exception& ex) {
-    ESP_LOGE(TAG, "authenticate failed: %s", ex.what());
-    esp_restart();
-  }
-  if (ctx->config.authData.empty()) {
-    ESP_LOGE(TAG, "login rejected%s", usingSaved ? ", forgetting it" : "");
+    if (!ctx->config.authData.empty()) break;
+    if (usingSaved && !rejected) {  // network trouble: keep the saved login and try again later
+      BELL_SLEEP_MS(30000);
+      continue;
+    }
+    ESP_LOGE(TAG, "login failed%s; pick \"%s\" in the app again", usingSaved ? ", forgetting the saved one" : "",
+             devName.c_str());
     if (usingSaved) saveLogin("", {});
-    esp_restart();
+    usingSaved = false;
+    ctx.reset();
+    gotBlob = false;
   }
   if (!usingSaved || ctx->config.authData != savedAuth) saveLogin(blob->username, ctx->config.authData);
 
