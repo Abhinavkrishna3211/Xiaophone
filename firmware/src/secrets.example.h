@@ -4,9 +4,7 @@
 #define WIFI_SSID     "your-wifi-name"
 #define WIFI_PASS     "your-wifi-password"
 
-// Internet radio streams with ICY "Artist - Title" metadata
+// MP3 radio streams that send ICY "Artist - Title" metadata (tried in order, falls back to the next)
 #define STATION_URL_1 "http://stream.radioparadise.com/mp3-128"
-#define STATION_URL_2 "http://ice1.somafm.com/u80s-128-mp3"
-
-// MusicBrainz requires a contact in the User-Agent
-#define MB_CONTACT    "you@example.com"
+#define STATION_URL_2 "http://ice1.somafm.com/indiepop-128-mp3"
+#define STATION_URL_3 "http://ice1.somafm.com/u80s-128-mp3"
