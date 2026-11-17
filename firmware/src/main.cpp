@@ -1,4 +1,4 @@
-// Xiaophone: internet radio + album cover spinning like a record.
+// Xiaophone: internet radio + Spotify Connect, album cover spinning like a record.
 #include <Arduino.h>
 #include "config.h"
 #include "display.h"
@@ -8,6 +8,8 @@
 #include "net.h"
 #include "audio_player.h"
 #include "cover.h"
+#include <ESPmDNS.h>
+#include "spotify_bridge.h"
 
 #if DEMO_MODE
 static const char* DEMO[][2] = {
@@ -47,6 +49,20 @@ void loop() {
   static uint32_t lastLog = 0, lastFrames = 0;
   uint32_t now = millis();
   netLoop();
+
+#if !DEMO_MODE
+  static bool spotifyOn = false;
+  if (!spotifyOn && netUp()) {  // Spotify Connect: shows up as "Xiaophone" in the Spotify app
+    spotifyOn = true;
+    MDNS.begin("xiaophone");
+    spotify::Hooks h;
+    h.onTrack = [](const spotify::Track& t) { coverRequest(t.artist, t.title, t.imageUrl); };
+    h.onActive = audioYield;
+    h.mix = soundsMix;
+    spotify::begin("Xiaophone", PIN_BCLK, PIN_LRC, PIN_DIN, h);
+    Serial.println("[SPOTIFY] receiver started");
+  }
+#endif
 
   if (now - lastLog >= 5000) {
     uint32_t f = uiFrames();

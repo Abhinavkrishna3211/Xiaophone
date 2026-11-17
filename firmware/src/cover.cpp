@@ -14,11 +14,11 @@
 #include "net.h"
 
 #define UA "Xiaophone/1.0 ( https://github.com/Abhinavkrishna3211/Xiaophone )"
-#define JPG_CAP (100 * 1024)
-#define TMP_MAX 300  // decoded image is scaled down until it fits TMP_MAX x TMP_MAX
+#define JPG_CAP (200 * 1024)
+#define TMP_MAX 320  // decoded image is scaled down until it fits TMP_MAX x TMP_MAX (640 px -> half)
 #define CACHE_N 20
 
-struct Req { char artist[96]; char title[128]; };
+struct Req { char artist[96]; char title[128]; char url[128]; };
 static QueueHandle_t q;
 
 static uint8_t* jpg;     // downloaded JPEG
@@ -32,10 +32,11 @@ struct CacheEntry { std::string key; uint16_t* px = nullptr; bool hit = false; }
 static CacheEntry cache[CACHE_N];
 static int cacheNext = 0;
 
-void coverRequest(const std::string& artist, const std::string& title) {
+void coverRequest(const std::string& artist, const std::string& title, const std::string& imageUrl) {
   Req r{};
   strlcpy(r.artist, artist.c_str(), sizeof(r.artist));
   strlcpy(r.title, title.c_str(), sizeof(r.title));
+  strlcpy(r.url, imageUrl.c_str(), sizeof(r.url));
   xQueueOverwrite(q, &r);
 }
 
@@ -131,7 +132,7 @@ static bool decode(int len) {
   jpeg.close();
   if (!ok) return false;
   int m = std::min(tmpW, tmpH);
-  float s = (m >= 240 && m <= TMP_MAX) ? 1.0f : m / 240.0f;  // 250 px: plain centre crop; else scale
+  float s = m / 240.0f;  // fit the short side to the disc
   for (int y = 0; y < 240; y++)
     for (int x = 0; x < 240; x++) {
       int sx = tmpW / 2 + (int)((x - 120) * s), sy = tmpH / 2 + (int)((y - 120) * s);
@@ -240,7 +241,12 @@ static void coverTask(void*) {
       if (found) memcpy(cover, ce->px, 240 * 240 * 2);
       Serial.printf("[COVER] cache hit%s\n", found ? "" : " (no cover)");
     } else {
-      found = netUp() && lookup(r.artist, r.title);
+      if (r.url[0]) {  // Spotify gives the cover URL directly
+        int n = netUp() ? download(r.url) : 0;
+        found = n && decode(n);
+      } else {
+        found = netUp() && lookup(r.artist, r.title);
+      }
       CacheEntry& c = cache[cacheNext];
       cacheNext = (cacheNext + 1) % CACHE_N;
       c.key = key;

@@ -26,3 +26,9 @@ CLAUDE.md
 PLAN.md
 .claude/
 __pycache__/
+
+# ESP-IDF build output
+firmware/sdkconfig.xiao_esp32s3_plus
+firmware/sdkconfig.old
+firmware/managed_components/
+firmware/dependencies.lock

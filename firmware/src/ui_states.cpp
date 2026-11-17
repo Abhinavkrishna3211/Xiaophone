@@ -188,22 +188,22 @@ static void dotsDraw(LGFX_Sprite& s, int oy, uint32_t now) {
 
 // ---------- state machine ----------
 static void update(uint32_t now, float dt) {
-  bool net = netUp(), str = demo ? net : audioStreaming();
+  bool net = netUp(), str = demo ? net : audioStreaming(), paused = !demo && audioPaused();
   State prev = st;
   switch (st) {
     case SLEEP:   if (net) st = WAKE; break;
     case WAKE:    if (now - stT > 1500) st = TUNING; break;
     case TUNING:  if (str) st = PLAYING; break;
     case PLAYING:
-      if (net && str) lostSince = 0;
+      if (net && (str || paused)) lostSince = 0;
       else if (!lostSince) lostSince = now;
       else if (now - lostSince > 2000) st = LOST;
       break;
-    case LOST:    if (net && str) st = PLAYING; break;
+    case LOST:    if (net && (str || paused)) st = PLAYING; break;
   }
   if (st != prev) { stT = now; Serial.printf("[GFX] state: %s\n", NAMES[st]); }
 
-  float target = st == PLAYING ? FULL : st == TUNING ? 40 : 0;
+  float target = st == PLAYING ? (paused ? 0 : FULL) : st == TUNING ? 40 : 0;
   float k = st == LOST ? 0.5f : 2.5f;  // lost: slow wind-down
 
   if (tr == TR_NONE && st >= TUNING && discPending(nextTitle)) { tr = TR_DOWN; trT = now; }
