@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 470" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <rect width="860" height="470" rx="18" fill="#fbf6ea"/>
+  <text x="430" y="36" text-anchor="middle" font-size="20" font-weight="bold" fill="#7a5a26">Xiaophone wiring</text>
+
+  <!-- display -->
+  <circle cx="130" cy="235" r="92" fill="#2a2a30" stroke="#d4af37" stroke-width="5"/>
+  <circle cx="130" cy="235" r="40" fill="#f6ecd6" stroke="#d4af37" stroke-width="3"/>
+  <path d="M130 228 c-6-10-18-4-12 6 l12 12 l12-12 c6-10-6-16-12-6z" fill="#d4af37"/>
+  <text x="130" y="350" text-anchor="middle" font-weight="bold" fill="#5a4320">GC9A01 1.28" round</text>
+  <g font-size="12" fill="#5a4320" text-anchor="end">
+    <text x="298" y="134">VCC</text><text x="298" y="164">GND</text><text x="298" y="194">SCL</text>
+    <text x="298" y="224">SDA</text><text x="298" y="254">CS</text><text x="298" y="284">DC</text>
+    <text x="298" y="314">RES</text><text x="298" y="344">BLK</text>
+  </g>
+
+  <!-- XIAO -->
+  <rect x="380" y="100" width="120" height="270" rx="12" fill="#2b5a3c" stroke="#173a24" stroke-width="3"/>
+  <rect x="418" y="86" width="44" height="22" rx="5" fill="#b8b8b8"/>
+  <text x="440" y="236" text-anchor="middle" fill="#fff" font-weight="bold">XIAO</text>
+  <text x="440" y="254" text-anchor="middle" fill="#fff" font-size="11">ESP32S3 Plus</text>
+  <text x="440" y="400" text-anchor="middle" fill="#5a4320" font-size="12">USB-C 5 V in · U.FL antenna</text>
+  <g font-size="11" fill="#fff">
+    <text x="386" y="134">3V3</text><text x="386" y="164">GND</text><text x="386" y="194">D8</text>
+    <text x="386" y="224">D10</text><text x="386" y="254">D1</text><text x="386" y="284">D2</text>
+    <text x="386" y="314">D0</text><text x="386" y="344">3V3</text>
+  </g>
+  <g font-size="11" fill="#fff" text-anchor="end">
+    <text x="494" y="134">5V</text><text x="494" y="164">GND</text><text x="494" y="194">D4</text>
+    <text x="494" y="224">D3</text><text x="494" y="254">D5</text>
+  </g>
+
+  <!-- display wires -->
+  <g stroke-width="4" fill="none" stroke-linecap="round">
+    <path d="M305 130 H380" stroke="#e0463c"/>
+    <path d="M305 160 H380" stroke="#222"/>
+    <path d="M305 190 H380" stroke="#f2a33a"/>
+    <path d="M305 220 H380" stroke="#e8d23a"/>
+    <path d="M305 250 H380" stroke="#4aa35a"/>
+    <path d="M305 280 H380" stroke="#3a7ee0"/>
+    <path d="M305 310 H380" stroke="#9256d6"/>
+    <path d="M305 340 H380" stroke="#e0463c"/>
+  </g>
+  <path d="M215 200 C 260 200 260 235 305 235" stroke="#8a6a36" stroke-width="2" fill="none" stroke-dasharray="4 4"/>
+
+  <!-- amp -->
+  <rect x="590" y="110" width="110" height="170" rx="10" fill="#6b3a8a" stroke="#3f1f55" stroke-width="3"/>
+  <text x="645" y="270" text-anchor="middle" fill="#fff" font-weight="bold" font-size="12">MAX98357A</text>
+  <g font-size="11" fill="#fff">
+    <text x="596" y="134">VIN</text><text x="596" y="164">GND</text><text x="596" y="194">BCLK</text>
+    <text x="596" y="224">LRC</text><text x="596" y="254">DIN</text>
+  </g>
+  <g stroke-width="4" fill="none" stroke-linecap="round">
+    <path d="M500 130 H590" stroke="#e0463c"/>
+    <path d="M500 160 H590" stroke="#222"/>
+    <path d="M500 190 H590" stroke="#f2a33a"/>
+    <path d="M500 220 H590" stroke="#4aa35a"/>
+    <path d="M500 250 H590" stroke="#3a7ee0"/>
+  </g>
+  <!-- cap -->
+  <g transform="translate(545 300)">
+    <rect x="-10" y="0" width="20" height="34" rx="4" fill="#2d4f8a"/>
+    <text x="0" y="52" text-anchor="middle" font-size="11" fill="#5a4320">220–470 µF</text>
+    <text x="0" y="66" text-anchor="middle" font-size="11" fill="#5a4320">VIN↔GND</text>
+  </g>
+
+  <!-- speaker -->
+  <path d="M720 160 H760 M720 200 H760" stroke="#999" stroke-width="4"/>
+  <g transform="translate(790 180)">
+    <rect x="-30" y="-24" width="20" height="48" fill="#444"/>
+    <path d="M-10 -24 L24 -50 V50 L-10 24 Z" fill="#d4af37" stroke="#9a7a20" stroke-width="2"/>
+  </g>
+  <text x="790" y="260" text-anchor="middle" fill="#5a4320" font-size="12">4–8 Ω speaker</text>
+  <text x="645" y="300" text-anchor="middle" fill="#5a4320" font-size="11">GAIN, SD: leave open</text>
+</svg>
