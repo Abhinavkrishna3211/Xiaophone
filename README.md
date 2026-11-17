@@ -70,6 +70,11 @@ Spotify support uses [cspot](https://github.com/feelfreelinux/cspot), an unoffic
 Connect client, via [spotifyesp](https://github.com/sharkzor/spotifyesp). It is not made or
 endorsed by Spotify and may stop working if Spotify changes its protocol.
 
+Known issue (2026): for many accounts, especially newer ones, Spotify refuses the track
+key that unofficial clients use (`Audio key refused by Spotify ... code 0001`). The device
+connects and the app shows it playing, but no audio arrives. This happens on Spotify's side
+and also affects librespot and go-librespot. There is no fix yet. An older account may work.
+
 Serial logs are tagged `[WIFI] [AUDIO] [META] [COVER] [GFX] [MEM] [SPOTIFY]`. FPS, heap and PSRAM
 are printed every 5 s.
 
