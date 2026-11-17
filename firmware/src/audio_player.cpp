@@ -7,9 +7,10 @@
 #include "meta.h"
 #include "cover.h"
 #include "sounds.h"
+#include "spotify_bridge.h"
 
 static Audio audio;
-static volatile bool streaming = false;
+static volatile bool streaming = false, yieldReq = false;
 static const char* stations[] = {
   STATION_URL_1,
 #ifdef STATION_URL_2
@@ -21,7 +22,9 @@ static const char* stations[] = {
 };
 static const int NST = sizeof(stations) / sizeof(stations[0]);
 
-bool audioStreaming() { return streaming; }
+bool audioStreaming() { return streaming || spotify::playing(); }
+bool audioPaused() { return spotify::active() && !spotify::playing(); }
+void audioYield(bool y) { yieldReq = y; }
 uint32_t audioSampleRate() { return audio.getSampleRate(); }
 
 static void onInfo(Audio::msg_t m) {
@@ -47,8 +50,24 @@ static void audioTask(void*) {
   bool chimed = false;
   int station = 0, fails = 0;
   uint32_t t = 0, lastTry = 0, emptySince = 0;
+  bool yielded = false;
 
   for (;;) {
+    if (yieldReq != yielded) {
+      yielded = yieldReq;
+      if (yielded) {  // Spotify takes the speaker
+        audio.stopSong();
+        streaming = false;
+        mode = IDLE;
+        chimed = true;
+        Serial.println("[AUDIO] radio paused for Spotify");
+      } else {  // Spotify let go: route the I2S pins back to our channel and reconnect
+        audio.setPinout(PIN_BCLK, PIN_LRC, PIN_DIN);
+        lastTry = 0;
+        Serial.println("[AUDIO] radio back");
+      }
+    }
+    if (yielded) { vTaskDelay(20); continue; }
     audio.loop();
     uint32_t now = millis();
 

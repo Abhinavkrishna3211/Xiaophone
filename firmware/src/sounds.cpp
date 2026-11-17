@@ -51,15 +51,10 @@ void soundsCrackle() {
   crackOn = true;
 }
 
-// Called by ESP32-audioI2S for every output block (stereo int16 frames). Must set *cont,
-// otherwise the library drops the block.
-void audio_process_i2s(int16_t* buf, int32_t n, bool* cont) {
-  *cont = true;
-  if (!crackOn) return;
-  uint32_t sr = audioSampleRate();
-  if (!sr) return;
+void soundsMix(int16_t* buf, size_t n, uint32_t sr) {
+  if (!crackOn || !sr) return;
   uint32_t step = ((uint64_t)crackRate << 16) / sr;
-  for (int32_t i = 0; i < n; i++) {
+  for (size_t i = 0; i < n; i++) {
     uint32_t idx = crackPos >> 16;
     if (idx >= crackLen) { crackOn = false; return; }
     int32_t c = crack[idx] / 2;  // half level: quiet under the music
@@ -69,4 +64,11 @@ void audio_process_i2s(int16_t* buf, int32_t n, bool* cont) {
     }
     crackPos += step;
   }
+}
+
+// Called by ESP32-audioI2S for every output block (stereo int16 frames). Must set *cont,
+// otherwise the library drops the block.
+void audio_process_i2s(int16_t* buf, int32_t n, bool* cont) {
+  *cont = true;
+  soundsMix(buf, n, audioSampleRate());
 }
