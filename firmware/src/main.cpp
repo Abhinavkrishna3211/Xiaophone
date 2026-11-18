@@ -88,6 +88,7 @@ void loop() {
     u.canTake = [] { return !spotify::active() && !airplay::active(); };
     u.onActive = [](bool y) { audioYield(YIELD_USB, y); };
     u.mix = soundsMix;
+    u.onCover = [](const uint8_t* d, size_t n, const char* a, const char* t) { coverFromJpeg(d, n, a, t); };
     usbspk::begin(PIN_BCLK, PIN_LRC, PIN_DIN, USB_MAX_GAIN, u);
   }
 #endif

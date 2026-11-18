@@ -7,7 +7,9 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "usb_device_uac.h"
+#include "tusb.h"
 #include "lwip/sockets.h"
+#include <algorithm>
 #include <atomic>
 #include <cerrno>
 #include <fcntl.h>
@@ -210,6 +212,56 @@ static void feedTask(void*) {
   }
 }
 
+// ---- album covers over the USB serial port (the sound card gets no song info).
+// Packet: "XPC1", u16 meta length, u32 JPEG length (little endian), meta = artist TAB title (UTF-8),
+// then a baseline JPEG. Replies "OK" or "ERR ..." lines. tools/usb_cover.py is the sender.
+static const size_t COVER_MAX = 200 * 1024;
+static uint8_t* coverBuf;  // in PSRAM
+static volatile int64_t lastCover = -1;
+
+static size_t cdcRead(uint8_t* dst, size_t n, int timeoutMs) {
+  size_t got = 0;
+  int64_t end = esp_timer_get_time() + timeoutMs * 1000LL;
+  while (got < n) {
+    uint32_t a = tud_cdc_available();
+    if (a) got += tud_cdc_read(dst + got, std::min<uint32_t>(a, n - got));
+    else if (esp_timer_get_time() > end) break;
+    else vTaskDelay(pdMS_TO_TICKS(2));
+  }
+  return got;
+}
+
+static void reply(const char* s) {
+  if (!tud_cdc_connected()) return;
+  tud_cdc_write_str(s);
+  tud_cdc_write_flush();
+}
+
+static void coverTask(void*) {
+  static char meta[256];
+  for (;;) {
+    uint8_t b;
+    int m = 0;
+    while (m < 4) {  // resync on the magic, so a half-sent packet never wedges the link
+      if (cdcRead(&b, 1, 1000) != 1) continue;
+      m = b == "XPC1"[m] ? m + 1 : (b == 'X' ? 1 : 0);
+    }
+    uint8_t h[6];
+    if (cdcRead(h, 6, 500) != 6) { reply("ERR header\n"); continue; }
+    size_t ml = h[0] | h[1] << 8;
+    size_t jl = h[2] | h[3] << 8 | h[4] << 16 | (size_t)h[5] << 24;
+    if (ml >= sizeof(meta) || jl == 0 || jl > COVER_MAX) { reply("ERR size\n"); continue; }
+    if (cdcRead((uint8_t*)meta, ml, 1000) != ml || cdcRead(coverBuf, jl, 5000) != jl) { reply("ERR short\n"); continue; }
+    meta[ml] = 0;
+    char* title = strchr(meta, '\t');
+    if (title) *title++ = 0;
+    ESP_LOGI(TAG, "cover from USB: %u bytes, %s - %s", (unsigned)jl, meta, title ? title : "");
+    lastCover = esp_timer_get_time();
+    if (hooks.onCover) hooks.onCover(coverBuf, jl, meta, title ? title : "");
+    reply("OK\n");
+  }
+}
+
 static void onVolume(uint32_t v, void*) {  // host volume 0..100 = -50..0 dB
   float db = (v > 100 ? 100 : (int)v) / 2.0f - 50.0f;
   gain = v == 0 ? 0 : (int32_t)(powf(10.0f, db / 20.0f) * maxGain * 65536);
@@ -241,10 +293,15 @@ void begin(int bclk, int lrclk, int dout, float mg, Hooks h) {
     return;
   }
   if (uac_device_init(&cfg) != ESP_OK) { ESP_LOGE(TAG, "USB audio init failed"); return; }
+  coverBuf = (uint8_t*)heap_caps_malloc(COVER_MAX, MALLOC_CAP_SPIRAM);
+  if (!coverBuf || xTaskCreatePinnedToCoreWithCaps(coverTask, "usbcover", 4096, nullptr, 1, nullptr, 0,
+                                                   MALLOC_CAP_SPIRAM) != pdPASS)
+    ESP_LOGE(TAG, "no memory for USB covers");
   ESP_LOGI(TAG, "USB speaker ready");
 }
 
 bool active() { return tx != nullptr; }
 bool playing() { return tx && esp_timer_get_time() - lastSound < 1000000; }
+bool hostCovers() { return lastCover >= 0 && esp_timer_get_time() - lastCover < 10 * 60 * 1000000LL; }
 
 }  // namespace usbspk
