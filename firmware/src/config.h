@@ -3,7 +3,7 @@
 
 #define DEMO_MODE 0          // 1 = no radio; cycle 5 known songs' covers every 20 s (for filming)
 #define VOLUME    12         // 0..21
-#define USB_MAX_GAIN 0.6f    // USB speaker loudness at full phone volume (0..1); lower if a phone browns out
+#define USB_MAX_GAIN 1.0f    // USB speaker loudness at full host volume (0..1); lower if a phone browns out
 #define AIRPLAY_MAX_GAIN 1.0f // AirPlay loudness at full phone volume (0..1); board has its own power here
 #define SPI_HZ    40000000   // display SPI clock; try 80000000 if the picture stays clean
 
