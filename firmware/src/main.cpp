@@ -1,5 +1,7 @@
 // Xiaophone: internet radio + Spotify Connect + USB speaker, album cover spinning like a record.
 #include <Arduino.h>
+#include "esp_heap_caps.h"
+#include "esp_log.h"
 #include "config.h"
 #include "display.h"
 #include "disc.h"
@@ -26,6 +28,11 @@ static const char* DEMO[][2] = {
 static void logMem(const char* when) {
   Serial.printf("[MEM] %s: heap free %u (min %u), PSRAM free %u / %u\n", when, ESP.getFreeHeap(),
                 ESP.getMinFreeHeap(), ESP.getFreePsram(), ESP.getPsramSize());
+  // internal RAM is what runs out (Wi-Fi + USB); ESP_LOG so it also reaches the Wi-Fi log
+  ESP_LOGW("MEM", "%s: internal free %u, largest %u, min %u, wifi %s", when,
+           (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+           (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
+           (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL), netUp() ? "up" : "DOWN");
 }
 
 void setup() {
