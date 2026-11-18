@@ -58,6 +58,7 @@ def packet(artist, title, jpg):
 
 
 def main():
+    sys.stdout.reconfigure(errors="replace")  # emoji in a title must not kill it on a cp1252 console
     want = sys.argv[1] if len(sys.argv) > 1 else None
     port, last = None, None
     while True:
