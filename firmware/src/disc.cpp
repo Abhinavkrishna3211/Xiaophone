@@ -4,7 +4,7 @@
 #include <vector>
 #include "disc.h"
 
-static LGFX_Sprite spr[2];
+static LGFX_Sprite spr[2], sleepSpr;
 static int front = 0;
 static bool isDefault[2] = {true, true};
 static std::atomic<bool> pending{false};
@@ -93,18 +93,20 @@ static void buildGloss() {
 void discBegin() {
   gold = rgb(212, 175, 55);
   spindle = rgb(25, 22, 20);
-  for (auto& s : spr) {
-    s.setPsram(true);
-    s.setColorDepth(16);
-    s.createSprite(240, 240);
+  for (auto* s : {&spr[0], &spr[1], &sleepSpr}) {
+    s->setPsram(true);
+    s->setColorDepth(16);
+    s->createSprite(240, 240);
   }
   buildDefault(spr[0]);
+  buildDefault(sleepSpr);
   buildGloss();
   Serial.printf("[GFX] discs ready, gloss %u px\n", (unsigned)gloss.size());
 }
 
 LGFX_Sprite* discFront() { return &spr[front]; }
 bool discFrontIsDefault() { return isDefault[front]; }
+LGFX_Sprite* discSleep() { return &sleepSpr; }
 bool discBackFree() { return !pending.load(); }
 
 void discBuild(const uint16_t* cover) {

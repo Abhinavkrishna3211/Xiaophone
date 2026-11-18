@@ -7,6 +7,7 @@
 void discBegin();
 LGFX_Sprite* discFront();
 bool discFrontIsDefault();
+LGFX_Sprite* discSleep();  // default label for the sleeping face; leaves the loaded cover alone
 
 // cover task side
 bool discBackFree();

@@ -125,6 +125,7 @@ def main():
                 port = serial.Serial(name, 115200, timeout=3)
                 print(f"connected on {name}                      ")
                 last = None  # new connection: send the current cover again
+            port.write(b"\n")  # keepalive: fails once the board restarted, so we reconnect and resend the cover
             np = asyncio.run(now_playing())
             if np and np[2]:
                 key = (np[0], np[1], hash(np[2]))
