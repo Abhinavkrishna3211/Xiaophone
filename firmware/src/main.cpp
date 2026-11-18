@@ -76,6 +76,7 @@ void loop() {
     ah.canTake = [] { return !spotify::active() && !usbspk::active(); };
     ah.onActive = [](bool y) { audioYield(YIELD_AIRPLAY, y); };
     ah.mix = soundsMix;
+    ah.onTrack = [] { nowPlayingKick(); };  // the cover comes from Spotify: ask now
     airplay::begin("Xiaophone", PIN_BCLK, PIN_LRC, PIN_DIN, AIRPLAY_MAX_GAIN, ah);
   }
   static bool usbOn = false;
@@ -97,6 +98,8 @@ void loop() {
     lastFrames = f;
     lastLog = now;
     logMem("status");
+    static bool told = false;  // why the last restart happened (1 power-on, 4 crash, 9 brownout...), once on the Wi-Fi log
+    if (!told && now > 10000) { told = true; ESP_LOGW("BOOT", "reset reason %d", (int)esp_reset_reason()); }
   }
 
 #if DEMO_MODE

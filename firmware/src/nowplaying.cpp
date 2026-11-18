@@ -86,14 +86,21 @@ static void poll() {
   coverRequest(artist, title, url);
 }
 
+static TaskHandle_t th;
+void nowPlayingKick() { if (th) xTaskNotifyGive(th); }
+
 static void task(void*) {
   Preferences p;
   p.begin("nowplay", true);
   bool same = p.getString("seed", "") == SPOTIFY_REFRESH_TOKEN;  // a new token in secrets.h wins
   refreshTok = same ? p.getString("rt", SPOTIFY_REFRESH_TOKEN) : String(SPOTIFY_REFRESH_TOKEN);
   p.end();
+  bool quick = false;
   for (;;) {
-    vTaskDelay(pdMS_TO_TICKS(4000));
+    // every 2 s, or right away when AirPlay says the song changed (then once more 1 s later, in case
+    // Spotify hadn't caught up yet)
+    bool kicked = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(quick ? 1000 : 2000));
+    quick = kicked;
     if (!(usbspk::active() || airplay::active()) || !netUp()) { lastId = ""; continue; }
     if (accessTok.isEmpty() || millis() - accessAt > accessFor - 60000) {
       if (!refresh()) { vTaskDelay(pdMS_TO_TICKS(30000)); continue; }
@@ -104,8 +111,9 @@ static void task(void*) {
 
 void nowPlayingBegin() {
   // TLS needs a deep stack; keep it in PSRAM, internal RAM is tight
-  xTaskCreatePinnedToCoreWithCaps(task, "nowplay", 12288, nullptr, 1, nullptr, 0, MALLOC_CAP_SPIRAM);
+  xTaskCreatePinnedToCoreWithCaps(task, "nowplay", 12288, nullptr, 1, &th, 0, MALLOC_CAP_SPIRAM);
 }
 #else
 void nowPlayingBegin() {}
+void nowPlayingKick() {}
 #endif
