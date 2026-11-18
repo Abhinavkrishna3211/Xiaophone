@@ -101,7 +101,8 @@ static void task(void*) {
     // Spotify hadn't caught up yet)
     bool kicked = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(quick ? 1000 : 2000));
     quick = kicked;
-    if (!(usbspk::active() || airplay::active()) || !netUp()) { lastId = ""; continue; }
+    // the computer sending covers over USB wins over the Spotify lookup
+    if (!(usbspk::active() || airplay::active()) || !netUp() || usbspk::hostCovers()) { lastId = ""; continue; }
     if (accessTok.isEmpty() || millis() - accessAt > accessFor - 60000) {
       if (!refresh()) { vTaskDelay(pdMS_TO_TICKS(30000)); continue; }
     }

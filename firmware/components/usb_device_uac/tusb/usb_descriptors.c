@@ -44,7 +44,7 @@ tusb_desc_device_t const desc_device = {
 
     .idVendor           = CONFIG_UAC_TUSB_VID,
     .idProduct          = CONFIG_UAC_TUSB_PID,
-    .bcdDevice          = 0x0100,
+    .bcdDevice          = 0x0101,  // bumped: a serial port joined the sound card, so hosts re-read the descriptors
 
     .iManufacturer      = 0x01,
     .iProduct           = 0x02,
@@ -63,16 +63,24 @@ uint8_t const *tud_descriptor_device_cb(void)
 //--------------------------------------------------------------------+
 // Configuration Descriptor
 //--------------------------------------------------------------------+
-#define CONFIG_TOTAL_LEN        (TUD_CONFIG_DESC_LEN + CFG_TUD_AUDIO * TUD_AUDIO_DEVICE_DESC_LEN)
+// Xiaophone: a CDC serial port after the audio interfaces carries album covers from the computer
+enum { ITF_NUM_CDC = ITF_NUM_TOTAL, ITF_NUM_CDC_DATA, ITF_COUNT };
+#define CONFIG_TOTAL_LEN        (TUD_CONFIG_DESC_LEN + CFG_TUD_AUDIO * TUD_AUDIO_DEVICE_DESC_LEN + CFG_TUD_CDC * TUD_CDC_DESC_LEN)
+#define EPNUM_CDC_NOTIF   0x83
+#define EPNUM_CDC_OUT     0x02
+#define EPNUM_CDC_IN      0x84
 #define EPNUM_AUDIO_OUT   0x01
 #define EPNUM_AUDIO_FB    0x81
 #define EPNUM_AUDIO_IN    0x82
 
 uint8_t const desc_configuration[] = {
     // Config number, interface count, string index, total length, attribute, power in mA
-    TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, 0x00, 100),
+    TUD_CONFIG_DESCRIPTOR(1, ITF_COUNT, 0, CONFIG_TOTAL_LEN, 0x00, 100),
     // Interface number, string index, EP Out & EP In address, EP size
     TUD_AUDIO_DESCRIPTOR(ITF_NUM_AUDIO_CONTROL, 4, EPNUM_AUDIO_OUT, EPNUM_AUDIO_IN, EPNUM_AUDIO_FB),
+#if CFG_TUD_CDC
+    TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 0, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT, EPNUM_CDC_IN, 64),
+#endif
 };
 
 // Invoked when received GET CONFIGURATION DESCRIPTOR
