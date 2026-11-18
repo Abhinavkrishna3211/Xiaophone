@@ -9,12 +9,16 @@ Packet (see usb_speaker.cpp): b"XPC1", u16 meta length, u32 JPEG length, "artist
 """
 import asyncio
 import io
+import json
+import re
 import struct
 import sys
 import time
+import urllib.parse
+import urllib.request
 
 import serial
-from PIL import Image, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 from serial.tools import list_ports
 from winsdk.windows.media.control import GlobalSystemMediaTransportControlsSessionManager as Media
 from winsdk.windows.storage.streams import Buffer, InputStreamOptions
@@ -44,9 +48,58 @@ async def now_playing():
     return p.artist or "", p.title or "", thumb
 
 
-def to_jpeg(raw):
-    """Centre square, 240 px, baseline JPEG: the firmware's JPEGDEC can't do PNG or progressive."""
-    im = ImageOps.fit(Image.open(io.BytesIO(raw)).convert("RGB"), (240, 240), Image.LANCZOS)
+JUNK = re.compile(r"[(\[][^)\]]*(video|lyric|visuali[sz]er|official|audio|full|song|4k|hd)[^)\]]*[)\]]"
+                  r"|\b(official|full|lyrics?|lyrical|video|visuali[sz]er)\b.*$", re.I)
+
+
+def clean(title):
+    """'Kalyani (with X) OFFICIAL MUSIC VIDEO | ARJN | ...' -> 'Kalyani'. YouTube titles carry a lot of junk."""
+    t = re.split(r"\s[|｜]", title)[0]
+    t = JUNK.sub("", t)
+    return re.sub(r"\s+", " ", t).strip(" -:")
+
+
+_art = {}
+
+
+def album_art(artist, title):
+    """600 px album cover from the iTunes search API (free, no key), or None. Cached per song."""
+    key = (artist, title)
+    if key not in _art:
+        _art[key] = None
+        t = clean(title)
+        for term in (f"{artist} {t}", t):
+            try:
+                q = urllib.parse.urlencode({"term": term, "entity": "song", "limit": 1})
+                with urllib.request.urlopen(f"https://itunes.apple.com/search?{q}", timeout=5) as r:
+                    res = json.load(r)["results"]
+                if res:
+                    url = res[0]["artworkUrl100"].replace("100x100bb", "600x600bb")
+                    with urllib.request.urlopen(url, timeout=5) as r:
+                        _art[key] = r.read()
+                    break
+            except (OSError, ValueError, KeyError):
+                pass
+    return _art[key]
+
+
+def square(im):
+    """Whole picture fitted into a 240 px square over a blurred, zoomed copy of itself: nothing cut off."""
+    bg = ImageOps.fit(im, (240, 240)).filter(ImageFilter.GaussianBlur(12))
+    fg = ImageOps.contain(im, (240, 240), Image.LANCZOS)
+    bg.paste(fg, ((240 - fg.width) // 2, (240 - fg.height) // 2))
+    return bg
+
+
+def to_jpeg(raw, artist="", title=""):
+    """240 px baseline JPEG (the firmware's JPEGDEC can't do PNG or progressive). Square art is used as is;
+    a wide video thumbnail is swapped for the real album cover, or shown whole if none is found."""
+    im = Image.open(io.BytesIO(raw)).convert("RGB")
+    if abs(im.width - im.height) > 0.05 * max(im.size):
+        art = album_art(artist, title)
+        im = ImageOps.fit(Image.open(io.BytesIO(art)).convert("RGB"), (240, 240), Image.LANCZOS) if art else square(im)
+    else:
+        im = ImageOps.fit(im, (240, 240), Image.LANCZOS)
     out = io.BytesIO()
     im.save(out, "JPEG", quality=90, progressive=False)
     return out.getvalue()
@@ -77,7 +130,7 @@ def main():
                 key = (np[0], np[1], hash(np[2]))
                 if key != last:
                     port.reset_input_buffer()
-                    port.write(packet(np[0], np[1], to_jpeg(np[2])))
+                    port.write(packet(np[0], np[1], to_jpeg(np[2], np[0], np[1])))
                     ans = port.readline().decode(errors="replace").strip() or "no answer"
                     print(f"{np[0]} - {np[1]}: {ans}")
                     last = key
@@ -93,4 +146,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if sys.argv[1:] == ["--test"]:
+        assert clean("KALYANI (with Shreya Ghoshal) OFFICIAL MUSIC VIDEO | ARJN | KDS") == "KALYANI (with Shreya Ghoshal)"
+        assert clean("God Mode - Video Song | Suriya's Karuppu") == "God Mode"
+        assert clean("Am I Dreaming (Visualizer)") == "Am I Dreaming"
+        assert clean("Veezha Veera Lyrical (Tamil) | OM") == "Veezha Veera"
+        assert square(Image.new("RGB", (150, 83))).size == (240, 240)
+        print("ok")
+    else:
+        main()
