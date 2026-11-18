@@ -11,6 +11,7 @@
 #include "net.h"
 #include "nowplaying.h"
 #include "usb_speaker.h"
+#include "airplay.h"
 
 #ifdef SPOTIFY_REFRESH_TOKEN
 static String refreshTok, accessTok, lastId;
@@ -93,7 +94,7 @@ static void task(void*) {
   p.end();
   for (;;) {
     vTaskDelay(pdMS_TO_TICKS(4000));
-    if (!usbspk::active() || !netUp()) { lastId = ""; continue; }
+    if (!(usbspk::active() || airplay::active()) || !netUp()) { lastId = ""; continue; }
     if (accessTok.isEmpty() || millis() - accessAt > accessFor - 60000) {
       if (!refresh()) { vTaskDelay(pdMS_TO_TICKS(30000)); continue; }
     }

@@ -9,10 +9,11 @@
 #include "sounds.h"
 #include "spotify_bridge.h"
 #include "usb_speaker.h"
+#include "airplay.h"
 
 static Audio audio;
 static volatile bool streaming = false;
-static volatile uint8_t yieldMask = 0;  // bit per speaker borrower (Spotify, USB)
+static volatile uint8_t yieldMask = 0;  // bit per speaker borrower (Spotify, USB, AirPlay)
 static const char* stations[] = {
   STATION_URL_1,
 #ifdef STATION_URL_2
@@ -24,8 +25,9 @@ static const char* stations[] = {
 };
 static const int NST = sizeof(stations) / sizeof(stations[0]);
 
-bool audioStreaming() { return streaming || spotify::playing() || usbspk::playing(); }
-bool audioPaused() { return (spotify::active() && !spotify::playing()) || (usbspk::active() && !usbspk::playing()); }
+bool audioStreaming() { return streaming || spotify::playing() || usbspk::playing() || airplay::playing(); }
+bool audioPaused() { return (spotify::active() && !spotify::playing()) || (usbspk::active() && !usbspk::playing()) ||
+                          (airplay::active() && !airplay::playing()); }
 void audioYield(uint8_t who, bool y) { if (y) yieldMask |= who; else yieldMask &= ~who; }
 uint32_t audioSampleRate() { return audio.getSampleRate(); }
 
