@@ -13,6 +13,7 @@
 #include <ESPmDNS.h>
 #include "spotify_bridge.h"
 #include "usb_speaker.h"
+#include "airplay.h"
 #include "nowplaying.h"
 
 #if DEMO_MODE
@@ -71,6 +72,11 @@ void loop() {
     h.mix = soundsMix;
     spotify::begin("Xiaophone", PIN_BCLK, PIN_LRC, PIN_DIN, h);
     Serial.println("[SPOTIFY] receiver started");
+    airplay::Hooks ah;  // AirPlay: "Xiaophone" in the iPhone's AirPlay menu
+    ah.canTake = [] { return !spotify::active() && !usbspk::active(); };
+    ah.onActive = [](bool y) { audioYield(YIELD_AIRPLAY, y); };
+    ah.mix = soundsMix;
+    airplay::begin("Xiaophone", PIN_BCLK, PIN_LRC, PIN_DIN, AIRPLAY_MAX_GAIN, ah);
   }
   static bool usbOn = false;
   if (!usbOn && now > 6000) {  // USB sound card: the first seconds of boot log stay on the USB console
@@ -78,7 +84,7 @@ void loop() {
     Serial.println("[USB] switching USB to speaker mode, console ends here");
     Serial.flush();
     usbspk::Hooks u;
-    u.canTake = [] { return !spotify::active(); };
+    u.canTake = [] { return !spotify::active() && !airplay::active(); };
     u.onActive = [](bool y) { audioYield(YIELD_USB, y); };
     u.mix = soundsMix;
     usbspk::begin(PIN_BCLK, PIN_LRC, PIN_DIN, USB_MAX_GAIN, u);
