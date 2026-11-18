@@ -189,18 +189,17 @@ static void dotsDraw(LGFX_Sprite& s, int oy, uint32_t now) {
 // ---------- state machine ----------
 static void update(uint32_t now, float dt) {
   bool str = demo ? netUp() : audioStreaming(), paused = !demo && audioPaused();
-  bool net = netUp() || str || paused;  // USB / phone audio needs no Wi-Fi: it wakes the record too
   State prev = st;
-  switch (st) {
-    case SLEEP:   if (net) st = WAKE; break;
+  switch (st) {  // asleep whenever nothing plays; any sound (radio, Spotify, AirPlay, USB) wakes it
+    case SLEEP:   if (str) st = WAKE; break;
     case WAKE:    if (now - stT > 1500) st = TUNING; break;
-    case TUNING:  if (str) st = PLAYING; break;
+    case TUNING:  if (str) st = PLAYING; else if (now - stT > 10000) st = SLEEP; break;
     case PLAYING:
-      if (net && (str || paused)) lostSince = 0;
+      if (str) lostSince = 0;
       else if (!lostSince) lostSince = now;
       else if (now - lostSince > 2000) st = LOST;
       break;
-    case LOST:    if (net && (str || paused)) st = PLAYING; break;
+    case LOST:    if (str) st = PLAYING; else if (now - stT > 3000) st = SLEEP; break;  // wind down, then doze off
   }
   if (st != prev) { stT = now; Serial.printf("[GFX] state: %s\n", NAMES[st]); }
 
@@ -237,7 +236,7 @@ static void update(uint32_t now, float dt) {
 }
 
 static void overlays(LGFX_Sprite& s, int oy, uint32_t now) {
-  bool def = discFrontIsDefault();
+  bool def = discFrontIsDefault() || st == SLEEP || st == WAKE;
   if (def && bright == 255 && st != LOST) {
     float pulse = st == SLEEP ? 1 + 0.05f * sinf(now / 480.0f)
                 : st == WAKE  ? 1 + 0.45f * sinf(3.1416f * fminf(1, (now - stT) / 800.0f))
@@ -261,7 +260,7 @@ static void renderTask(void*) {
     prev = now;
     update(now, dt);
 
-    LGFX_Sprite* d = discFront();
+    LGFX_Sprite* d = (st == SLEEP || st == WAKE) ? discSleep() : discFront();
     tft.startWrite();
     for (int i = 0; i < 240 / SH; i++) {
       LGFX_Sprite& s = strip[i & 1];
