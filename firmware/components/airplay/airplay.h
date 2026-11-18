@@ -11,6 +11,7 @@ struct Hooks {
   std::function<bool()> canTake;                       // false: someone else owns the speaker
   std::function<void(bool)> onActive;                  // true: about to take the speaker, false: released it
   std::function<void(int16_t*, size_t, uint32_t)> mix; // stereo frames, sample rate: add effects in place
+  std::function<void()> onTrack;                       // the song changed
 };
 
 // Call once Wi-Fi and mDNS are up.

@@ -33,9 +33,9 @@ static const uint32_t RATE = 44100;
 static const int RTSP_PORT = 5000, AUDIO_PORT = 6000, CONTROL_PORT = 6001, TIMING_PORT = 6002;
 static const int MAX_FPP = 352;         // frames per packet the senders use
 static const int SLOTS = 1024;          // jitter buffer, packets (power of two), ~8 s
-static const int PREFILL = 120;         // packets queued before playing (~1 s): rides out Wi-Fi hiccups
+static const int PREFILL = 200;         // packets queued before playing (~1.6 s): rides out Wi-Fi hiccups
 static const int LOW = PREFILL / 2, HIGH = PREFILL * 3 / 2;
-static const int REQ_MAX = 16384;
+static const int REQ_MAX = 64 * 1024;  // PSRAM
 
 // Key pair of the original AirPort Express. It was published long ago and every open AirPlay
 // receiver uses it: senders check that the speaker can answer their challenge with it.
@@ -96,6 +96,7 @@ static volatile bool haveFirst, playerReady;
 static volatile uint32_t firstGen;
 static volatile uint16_t firstSeq, latestSeq, nextSeq;
 static volatile uint32_t lost, late, underruns, nudges, resent, packets;
+static int peak;  // loudest sample from the sender since the last status line (0 = it sends silence)
 static volatile int64_t lastPacket;
 
 static int rng(void*, unsigned char* b, size_t n) {
@@ -247,6 +248,11 @@ static void playTask(void*) {
     int depth = ready ? (int16_t)(latestSeq - nextSeq) + 1 : 0;
     if (!started && ready && depth >= PREFILL) started = true;
     if (started && depth <= 0) { started = false; underruns = underruns + 1; }
+    if (started && depth > SLOTS / 2) {  // sender burst far ahead: nudging can't catch up, jump to just behind it
+      nextSeq = latestSeq - PREFILL + 1;
+      depth = PREFILL;
+      ESP_LOGW(TAG, "too far behind, skipped ahead");
+    }
     if (!started) {
       memset(out, 0, frames * 4);  // filling up or paused: silence
     } else {
@@ -254,6 +260,7 @@ static void playTask(void*) {
       if (s.ok && s.seq == nextSeq) {
         memcpy(out, s.pcm, frames * 4);
         s.ok = false;
+        for (int i = 0; i < frames * 2; i++) { int a = abs((int)out[i]); if (a > peak) peak = a; }
       } else {
         memset(out, 0, frames * 4);
         lost = lost + 1;
@@ -277,9 +284,10 @@ static void playTask(void*) {
     int64_t now = esp_timer_get_time();
     if (now - lastLog > 10000000) {
       lastLog = now;
-      ESP_LOGI(TAG, "queued %d, packets %u, lost %u, late %u, resent %u, underruns %u, nudges %u", depth,
-               (unsigned)packets, (unsigned)lost, (unsigned)late, (unsigned)resent, (unsigned)underruns,
-               (unsigned)nudges);
+      ESP_LOGI(TAG, "queued %d, packets %u, lost %u, late %u, resent %u, underruns %u, nudges %u, peak %d, gain %d",
+               depth, (unsigned)packets, (unsigned)lost, (unsigned)late, (unsigned)resent, (unsigned)underruns,
+               (unsigned)nudges, peak, (int)gain);
+      peak = 0;
     }
   }
 }
@@ -397,8 +405,22 @@ static bool announce(const char* sdp) {
 
 static void setVolume(float v) {  // sender sends -30..0, -144 is mute
   if (v <= -100) gain = 0;
-  else gain = (int32_t)(powf(10.0f, v * 1.6f / 20.0f) * maxGain * 65536);  // -30 maps to about -48 dB
+  else gain = (int32_t)(powf(10.0f, v / 40.0f) * maxGain * 65536);  // half a dB per step: the phone starts at -20 = -10 dB
   ESP_LOGI(TAG, "volume %.1f", v);
+}
+
+static char artist[96], title[128];
+
+// DMAP: 4-byte tag, 4-byte big-endian length, data. Finds one string tag anywhere in the body.
+static void dmapString(const char* b, int n, const char* tag, char* out, size_t sz) {
+  for (int i = 0; i + 8 <= n; i++) {
+    if (memcmp(b + i, tag, 4)) continue;
+    const uint8_t* l = (const uint8_t*)b + i + 4;
+    int len = (l[0] << 24) | (l[1] << 16) | (l[2] << 8) | l[3];
+    if (len < 0 || i + 8 + len > n) continue;
+    snprintf(out, sz, "%.*s", len, b + i + 8);
+    return;
+  }
 }
 
 // Reads and answers one request. False: connection closed.
@@ -415,7 +437,7 @@ static bool handle(int cli, char* req) {
   }
   const char* cl = header(req, "Content-Length");
   int bodyLen = cl ? atoi(cl) : 0, need = hdrEnd + bodyLen;
-  if (bodyLen < 0 || need > REQ_MAX) return false;  // we never ask for artwork, so bodies stay small
+  if (bodyLen < 0 || need > REQ_MAX) return false;
   while (len < need) {
     int n = recv(cli, req + len, need - len, 0);
     if (n <= 0) return false;
@@ -469,8 +491,21 @@ static bool handle(int cli, char* req) {
     endStream();
     ESP_LOGI(TAG, "sender stopped");
   } else if (!strcmp(method, "SET_PARAMETER")) {
-    const char* v = strstr(body, "volume:");
-    if (v) setVolume(strtof(v + 7, nullptr));
+    char ct[64] = "";
+    copyValue(ct, sizeof(ct), header(req, "Content-Type"));
+    if (!strcmp(ct, "application/x-dmap-tagged")) {  // track info, sent when the song changes
+      char was[sizeof(title)];
+      strlcpy(was, title, sizeof(was));
+      dmapString(body, bodyLen, "asar", artist, sizeof(artist));
+      dmapString(body, bodyLen, "minm", title, sizeof(title));
+      if (strcmp(was, title)) {
+        ESP_LOGI(TAG, "now playing: %s - %s", artist, title);
+        if (hooks.onTrack) hooks.onTrack();
+      }
+    } else {
+      const char* v = strstr(body, "volume:");
+      if (v) setVolume(strtof(v + 7, nullptr));
+    }
   }
   char resp[900];
   int rl = snprintf(resp, sizeof(resp),
@@ -551,7 +586,7 @@ void begin(const char* name, int bclk, int lrclk, int dout, float mg, Hooks h) {
   mdns_txt_item_t txt[] = {
       {"txtvers", "1"}, {"ch", "2"},       {"cn", "1"},        {"et", "0,1"},  {"ek", "1"},
       {"sv", "false"},  {"da", "true"},    {"sr", "44100"},    {"ss", "16"},   {"pw", "false"},
-      {"vn", "3"},      {"tp", "UDP"},     {"sf", "0x4"},      {"am", "Xiaophone"}, {"vs", "105.1"},
+      {"vn", "3"},      {"tp", "UDP"},     {"sf", "0x4"},      {"am", "Xiaophone"}, {"vs", "105.1"}, {"md", "0"},  // md: send track info
   };
   esp_err_t e = mdns_service_add(inst, "_raop", "_tcp", RTSP_PORT, txt, sizeof(txt) / sizeof(txt[0]));
   if (e != ESP_OK) ESP_LOGE(TAG, "mDNS advert failed: %s", esp_err_to_name(e));

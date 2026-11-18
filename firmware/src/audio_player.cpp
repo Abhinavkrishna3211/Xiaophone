@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <LittleFS.h>
+#include "esp_log.h"
 #include "Audio.h"
 #include "audio_player.h"
 #include "config.h"
@@ -11,7 +12,8 @@
 #include "usb_speaker.h"
 #include "airplay.h"
 
-static Audio audio;
+static Audio* audio;  // deleted while another source owns the speaker: frees its ~28 KB of DMA RAM
+static volatile uint32_t rate = 44100;
 static volatile bool streaming = false;
 static volatile uint8_t yieldMask = 0;  // bit per speaker borrower (Spotify, USB, AirPlay)
 static const char* stations[] = {
@@ -28,8 +30,11 @@ static const int NST = sizeof(stations) / sizeof(stations[0]);
 bool audioStreaming() { return streaming || spotify::playing() || usbspk::playing() || airplay::playing(); }
 bool audioPaused() { return (spotify::active() && !spotify::playing()) || (usbspk::active() && !usbspk::playing()) ||
                           (airplay::active() && !airplay::playing()); }
-void audioYield(uint8_t who, bool y) { if (y) yieldMask |= who; else yieldMask &= ~who; }
-uint32_t audioSampleRate() { return audio.getSampleRate(); }
+void audioYield(uint8_t who, bool y) {
+  if (y) yieldMask |= who; else yieldMask &= ~who;
+  for (int i = 0; y && audio && i < 100; i++) vTaskDelay(10);  // let the radio free the I2S pins before they're taken
+}
+uint32_t audioSampleRate() { return rate; }
 
 static void onInfo(Audio::msg_t m) {
   switch (m.e) {
@@ -40,9 +45,9 @@ static void onInfo(Audio::msg_t m) {
       else Serial.println("[META] (ignored: station ID / no artist)");
       break;
     }
-    case Audio::evt_name:    Serial.printf("[AUDIO] station: %s\n", m.msg); break;
-    case Audio::evt_bitrate: Serial.printf("[AUDIO] bitrate: %s\n", m.msg); break;
-    case Audio::evt_eof:     Serial.printf("[AUDIO] end of stream: %s\n", m.msg); break;
+    case Audio::evt_name:    ESP_LOGW("AUDIO", "station: %s", m.msg); break;
+    case Audio::evt_bitrate: ESP_LOGW("AUDIO", "bitrate: %s", m.msg); break;
+    case Audio::evt_eof:     ESP_LOGW("AUDIO", "end of stream: %s", m.msg); break;
     default: break;
   }
 }
@@ -60,26 +65,30 @@ static void audioTask(void*) {
     if ((yieldMask != 0) != yielded) {
       yielded = yieldMask != 0;
       if (yielded) {  // Spotify or USB takes the speaker
-        audio.stopSong();
+        delete audio;  // stops the song, releases its I2S channel and task
+        audio = nullptr;
         streaming = false;
         mode = IDLE;
         chimed = true;
-        Serial.println("[AUDIO] radio paused");
+        ESP_LOGW("AUDIO", "radio paused");
       } else {  // speaker free again: route the I2S pins back to our channel and reconnect
-        audio.setPinout(PIN_BCLK, PIN_LRC, PIN_DIN);
+        audio = new Audio();
+        audio->setPinout(PIN_BCLK, PIN_LRC, PIN_DIN);
+        audio->setVolume(VOLUME);
         lastTry = 0;
-        Serial.println("[AUDIO] radio back");
+        ESP_LOGW("AUDIO", "radio back");
       }
     }
     if (yielded) { vTaskDelay(20); continue; }
-    audio.loop();
+    audio->loop();
+    rate = audio->getSampleRate();
     uint32_t now = millis();
 
     if (!netUp()) {
       if (mode != IDLE) {
-        audio.stopSong();
+        audio->stopSong();
         mode = IDLE;
-        Serial.println("[AUDIO] stopped: Wi-Fi down");
+        ESP_LOGW("AUDIO", "stopped: Wi-Fi down");
       }
       streaming = false;
       vTaskDelay(20);
@@ -90,27 +99,27 @@ static void audioTask(void*) {
       case IDLE:
         if (!chimed) {  // wake-up chime, once per boot
           chimed = true;
-          if (soundsHaveChime() && audio.connecttoFS(LittleFS, "/chime.wav")) { mode = CHIME; t = now; }
+          if (soundsHaveChime() && audio->connecttoFS(LittleFS, "/chime.wav")) { mode = CHIME; t = now; }
         } else if (!lastTry || now - lastTry > 3000) {
           lastTry = now;
-          Serial.printf("[AUDIO] connecting station %d: %s\n", station + 1, stations[station]);
-          if (audio.connecttohost(stations[station])) { mode = PLAYING; t = now; emptySince = 0; }
+          ESP_LOGW("AUDIO", "connecting station %d: %s", station + 1, stations[station]);
+          if (audio->connecttohost(stations[station])) { mode = PLAYING; t = now; emptySince = 0; }
           else if (++fails >= 2) { station = (station + 1) % NST; fails = 0; }
         }
         break;
 
       case CHIME:
-        if (!audio.isRunning() || now - t > 4000) { audio.stopSong(); mode = IDLE; lastTry = 0; }
+        if (!audio->isRunning() || now - t > 4000) { audio->stopSong(); mode = IDLE; lastTry = 0; }
         break;
 
       case PLAYING: {
-        bool running = audio.isRunning();
+        bool running = audio->isRunning();
         // stall guard: running but no data for 8 s
-        if (running && audio.inBufferFilled() == 0) { if (!emptySince) emptySince = now; }
+        if (running && audio->inBufferFilled() == 0) { if (!emptySince) emptySince = now; }
         else emptySince = 0;
         if (!running || (emptySince && now - emptySince > 8000)) {
-          Serial.println("[AUDIO] stream lost, reconnecting");
-          audio.stopSong();
+          ESP_LOGW("AUDIO", "stream lost, reconnecting");
+          audio->stopSong();
           streaming = false;
           mode = IDLE;
           lastTry = now;
@@ -119,6 +128,11 @@ static void audioTask(void*) {
         }
         streaming = true;
         if (now - t > 30000) fails = 0;
+        static uint32_t lastLog;
+        if (now - lastLog > 10000) {
+          lastLog = now;
+          ESP_LOGI("AUDIO", "radio buffer %u bytes, %u Hz", (unsigned)audio->inBufferFilled(), (unsigned)rate);
+        }
         break;
       }
     }
@@ -128,8 +142,9 @@ static void audioTask(void*) {
 
 void audioBegin() {
   Audio::audio_info_callback = onInfo;
-  audio.setPinout(PIN_BCLK, PIN_LRC, PIN_DIN);
-  audio.setVolume(VOLUME);
+  audio = new Audio();
+  audio->setPinout(PIN_BCLK, PIN_LRC, PIN_DIN);
+  audio->setVolume(VOLUME);
   xTaskCreatePinnedToCore(audioTask, "audio", 8192, nullptr, 5, nullptr, 0);
   Serial.printf("[AUDIO] task started, %d stations, volume %d\n", NST, VOLUME);
 }

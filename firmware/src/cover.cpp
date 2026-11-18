@@ -1,3 +1,4 @@
+#include "esp_log.h"
 // Album cover lookup: MusicBrainz search -> scored release-groups -> Cover Art Archive
 // 250 px thumbnail -> JPEGDEC -> 240x240 RGB565 -> disc back buffer.
 #include <Arduino.h>
@@ -72,13 +73,13 @@ static bool getJson(const String& url, JsonDocument& doc, JsonDocument& filter) 
   HTTPClient http;
   int code = httpOpen(http, cli, url);
   if (code != 200) {
-    Serial.printf("[COVER] HTTP %d for %s\n", code, url.c_str());
+    ESP_LOGI("COVER", "HTTP %d for %s", code, url.c_str());
     http.end();
     return false;
   }
   DeserializationError e = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
   http.end();
-  if (e) Serial.printf("[COVER] JSON error: %s\n", e.c_str());
+  if (e) ESP_LOGI("COVER", "JSON error: %s", e.c_str());
   return !e;
 }
 
@@ -88,7 +89,7 @@ static int download(const String& url) {
   int code = httpOpen(http, cli, url);
   int len = http.getSize();
   if (code != 200 || len > JPG_CAP) {
-    Serial.printf("[COVER] image HTTP %d, size %d\n", code, len);
+    ESP_LOGI("COVER", "image HTTP %d, size %d", code, len);
     http.end();
     return 0;
   }
@@ -194,7 +195,7 @@ static bool lookup(const std::string& artist, const std::string& title) {
   std::sort(cands.begin(), cands.end(), [](const Cand& a, const Cand& b) {
     return a.score != b.score ? a.score > b.score : a.date < b.date;
   });
-  Serial.printf("[COVER] %u candidate release-groups\n", (unsigned)cands.size());
+  ESP_LOGI("COVER", "%u candidate release-groups", (unsigned)cands.size());
 
   // 3. Cover Art Archive: first front image of the top 8, stop at the first that decodes
   JsonDocument cf;
@@ -219,7 +220,7 @@ static bool lookup(const std::string& artist, const std::string& title) {
                     cands[i].score, cands[i].rg.c_str());
       return true;
     }
-    Serial.println("[COVER] image download/decode failed, trying next");
+    ESP_LOGI("COVER", "image download/decode failed, trying next");
   }
   return false;
 }
@@ -230,7 +231,7 @@ static void coverTask(void*) {
     xQueueReceive(q, &r, portMAX_DELAY);
     uint32_t t0 = millis();
     std::string key = metaLower(r.artist) + "|" + metaLower(r.title);
-    Serial.printf("[COVER] lookup: %s - %s\n", r.artist, r.title);
+    ESP_LOGI("COVER", "lookup: %s - %s", r.artist, r.title);
 
     CacheEntry* ce = nullptr;
     for (auto& c : cache)
@@ -239,7 +240,7 @@ static void coverTask(void*) {
     if (ce) {
       found = ce->hit;
       if (found) memcpy(cover, ce->px, 240 * 240 * 2);
-      Serial.printf("[COVER] cache hit%s\n", found ? "" : " (no cover)");
+      ESP_LOGI("COVER", "cache hit%s", found ? "" : " (no cover)");
     } else {
       if (r.url[0]) {  // Spotify gives the cover URL directly
         int n = netUp() ? download(r.url) : 0;
@@ -257,13 +258,13 @@ static void coverTask(void*) {
         else c.key.clear();
       }
     }
-    if (!found) Serial.println("[COVER] no cover, using default label");
+    if (!found) ESP_LOGI("COVER", "no cover, using default label");
 
     while (!discBackFree()) vTaskDelay(50);   // previous cover still being shown in
     if (uxQueueMessagesWaiting(q)) continue;  // a newer song arrived meanwhile: skip this one
     discBuild(found ? cover : nullptr);
     discCommit(r.title);
-    Serial.printf("[COVER] ready in %lu ms\n", millis() - t0);
+    ESP_LOGI("COVER", "ready in %lu ms", millis() - t0);
   }
 }
 
