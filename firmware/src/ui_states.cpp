@@ -188,7 +188,8 @@ static void dotsDraw(LGFX_Sprite& s, int oy, uint32_t now) {
 
 // ---------- state machine ----------
 static void update(uint32_t now, float dt) {
-  bool net = netUp(), str = demo ? net : audioStreaming(), paused = !demo && audioPaused();
+  bool str = demo ? netUp() : audioStreaming(), paused = !demo && audioPaused();
+  bool net = netUp() || str || paused;  // USB / phone audio needs no Wi-Fi: it wakes the record too
   State prev = st;
   switch (st) {
     case SLEEP:   if (net) st = WAKE; break;

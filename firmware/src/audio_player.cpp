@@ -41,6 +41,7 @@ static void onInfo(Audio::msg_t m) {
     case Audio::evt_streamtitle: {
       Serial.printf("[META] %s\n", m.msg);
       std::string artist, title;
+      if (yieldMask || usbspk::hostCovers()) break;  // another source owns the record: a late radio title mustn't replace its cover
       if (metaParse(m.msg, artist, title)) coverRequest(artist, title);
       else Serial.println("[META] (ignored: station ID / no artist)");
       break;
