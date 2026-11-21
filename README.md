@@ -130,11 +130,10 @@ data, so no secrets are ever sent.
 
 ## Enclosure
 
-The cabinet starts from the base model (`enclosure/raw/`, not tracked) and is rebuilt
-around the hardware by re-runnable Blender scripts in `enclosure/scripts/`
-(`blender -b -P <script>.py`, in order 00 to 06; every dimension lives in `DIM` in
-`_common.py`). `check_parts.py` (trimesh) verifies the STLs and writes
-`stl/xiaophone_all.3mf`.
+The final design is `enclosure/xiaophone.blend` (Blender 4.3), with all 29 parts in
+place. Print-ready files are in `enclosure/stl/`: one STL per part, already oriented for
+the bed, plus `xiaophone_all.3mf` and one plate per filament colour
+(`plate_ivory.3mf`, `plate_gold.3mf`, `plate_black.3mf`).
 
 | Part | Colour | Notes |
 |---|---|---|

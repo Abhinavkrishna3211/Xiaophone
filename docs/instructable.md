@@ -20,7 +20,7 @@ She has moods, too:
 
 Everything runs on **one board**: Wi-Fi internet radio, cover lookup, audio and the spinning display. You plug in a USB-C cable and she plays.
 
-All code, Blender scripts and STLs: **https://github.com/Abhinavkrishna3211/Xiaophone**
+All code, the Blender design and STLs: **https://github.com/Abhinavkrishna3211/Xiaophone**
 
 ---
 
@@ -132,7 +132,7 @@ Let it play for 10 minutes. You're looking for no dropouts, a cover on every son
 I wanted a chubby, music-box style gramophone: square cabinet, raised side panels, gold corner caps, bun feet and a big scalloped horn.
 
 1. **Base model:** I drew a reference image of the look I wanted and turned it into a rough 3D model with an image-to-3D generator (Tripo3D). That gives you the cute shape, but it's one lumpy mesh at a random size with no room inside.
-2. **Rebuilt around the hardware:** a set of re-runnable **Blender Python scripts** (`enclosure/scripts/00_import.py` … `06_export.py`, run with `blender -b -P <script>.py`) does the rest:
+2. **Rebuilt around the hardware in Blender:**
    - cleans and remeshes the model so it's watertight,
    - **scales it from the record, not the cabinet:** the platter becomes ~42 mm across to frame the 33 mm screen, and the cabinet ends up 68 mm wide, just enough for the 2" speaker in the floor,
    - hollows the cabinet with 2 mm walls,
@@ -145,7 +145,7 @@ I wanted a chubby, music-box style gramophone: square cabinet, raised side panel
 
 The rule I followed: **keep the base model's cute proportions and detail exactly**. Only the inside and the broken bits change.
 
-Every dimension lives in one `DIM` table in `_common.py`. If your display or speaker is a different size, change the number and re-run the scripts. `check_parts.py` then checks that every STL is watertight.
+The finished design is `enclosure/xiaophone.blend` in the repo. Open it in Blender if your display or speaker is a different size and you want to adjust the pockets. Every STL was checked to be watertight before printing.
 
 **Inside the box:** the speaker sits in a rounded-square **plinth** under the bottom plate, firing down through a flower pattern of sound holes. The bun feet lift everything so the sound escapes underneath, and from the side nothing round shows. The display is held in a stepped pocket under the lid. The XIAO stands upright in the back-right corner with its USB-C port at a slot low on the back. The amp sits in a corner beside the speaker magnet. The Wi-Fi antenna sticks to an inside side wall near the top, away from the magnet.
 
@@ -242,7 +242,7 @@ The best part is the little surprise every few minutes: a new song starts, the r
 
 Ideas if you build your own:
 - Swap in your favourite stations in `secrets.h`. Any stream that sends "Artist - Title" works, in any language. My tests found the right covers for English, Hindi, Malayalam, Tamil and Telugu songs.
-- Change the shape: every dimension is in `_common.py`.
+- Change the shape: open `enclosure/xiaophone.blend` in Blender.
 - Print it in other colours: mint and rose gold would be adorable.
 
 Thanks for reading! If you build a Xiaophone, I'd love to see what's spinning on yours. 💛
