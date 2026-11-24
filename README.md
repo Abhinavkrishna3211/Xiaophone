@@ -130,8 +130,8 @@ data, so no secrets are ever sent.
 
 ## Enclosure
 
-The cabinet was designed in Blender. Print-ready files are in `enclosure/stl/`: one STL
-per part, already oriented for the bed, plus `xiaophone_all.3mf`.
+Print-ready files are in `enclosure/stl/`: one STL per part, already oriented for the bed,
+plus `xiaophone_all.3mf`. The final Blender design (`enclosure/xiaophone.blend`) is on `main`.
 
 | Part | Colour | Notes |
 |---|---|---|
